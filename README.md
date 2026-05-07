@@ -76,7 +76,7 @@ A new browser tab will open. This is the Apps Script editor, where you will past
 
 Inside the Apps Script editor, you will see a file called `Code.gs` in the left panel. Click on it.
 
-Delete any starter code already in the file, then paste the full contents of the provided `Code.gs` from the [github repo](https://github.com/IPGeolocation/google-sheets) in the editor window.
+Delete any starter code already in the file, then paste the full contents of the provided [Code.gs](https://github.com/IPGeolocation/google-sheets/blob/main/Code.gs) in the editor window.
 
 ![Paste Code](https://static.ipgeolocation.io/web-assets/images/integrations/google-sheet/paste-code.png)
 
