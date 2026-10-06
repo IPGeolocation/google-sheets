@@ -361,7 +361,7 @@ When you have a large list of IP addresses, use `IPGEO_BULK` instead of individu
 =IPGEO_BULK(A2:A100, "security.threat_score", "security")
 ```
 
-If your sheet is running slowly because of too many individual formulas, switching to bulk lookup is the recommended fix. See the [The sheet has too many individual formulas](#troubleshooting) entry in the Troubleshooting section.
+If your sheet is running slowly because of too many individual formulas, switching to bulk lookup is the recommended fix. See the "[The sheet has too many individual formulas](#troubleshooting)" entry in the Troubleshooting section.
 
 ### Full JSON Response
 
@@ -371,13 +371,13 @@ If you want to see everything the API returns for an IP address, the `IPGEO_JSON
 =IPGEO_JSON(A2)
 ```
 
-For the full response including security details:
+For the full response, including security details:
 
 ```excel
 =IPGEO_JSON(A2, "security")
 ```
 
-This is also helpful when a formula returns a blank result and you want to check whether the field exists at all. See the [The formula returns a blank result](#troubleshooting) entry in the Troubleshooting section.
+This is also helpful when a formula returns a blank result and you want to check whether the field exists at all. See the "[The formula returns a blank result](#troubleshooting)" entry in the Troubleshooting section.
 
 ---
 
@@ -425,7 +425,7 @@ Refresh the Google Sheet. If it still does not appear, open Apps Script and conf
 
 **Google asks for permission when I run the function**
 
-This is normal and expected. The script needs your approval to call the IPGeolocation.io API from your sheet. Click through the permission screens to approve. This only happens once. For context, see the [Save Your API Key](#save-your-api-key) step.
+This is normal. The script needs your approval to call the IPGeolocation.io API from your sheet. Click through the permission screens to approve. This only happens once. For context, see the [Save Your API Key](#save-your-api-key) step.
 
 **The formula is stuck on "Loading"**
 
