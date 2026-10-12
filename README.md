@@ -407,13 +407,13 @@ Basic IP lookups for country, city, timezone, currency, and ASN data use fewer c
 
 Only use [Security Formulas](#security-formulas) or the [Dedicated Security Formula](#dedicated-security-formula) when you actually need VPN, proxy, Tor, bot, cloud provider, or threat score data. Using basic formulas for non-security use cases will help you avoid spending credits unnecessarily.
 
-For large datasets, the [Bulk Lookup Formula](#bulk-lookup-formula) is more credit-efficient than running individual formulas on each row.
+For large datasets, the [Bulk Lookup Formula](#bulk-lookup-formula) reduces formula and network overhead. Credit savings come from caching or avoiding duplicate lookups, not from batching itself.
 
 ---
 
 ## Troubleshooting
 
-If something is not working as expected, find your issue below and follow the fix. For setup-related issues, you may also want to revisit the [How to Set It Up](#how-to-set-it-up) steps to check nothing was missed.
+If something is not working as expected, find your issue below and follow the fix. For setup-related issues, you may also want to revisit the [How to Set It Up](#how-to-set-it-up) steps to check that nothing was missed.
 
 **The formula shows "Missing API key"**
 
