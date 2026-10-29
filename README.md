@@ -35,7 +35,7 @@ This makes the integration ideal for fraud review teams, security analysts, mark
 
 **A Google account with Google Sheets access** is required for the entire setup process.
 
-**An IPGeolocation.io account** is needed to access the API. You can sign up free at [ipgeolocation.io](https://ipgeolocation.io).
+**An IPGeolocation.io account** is needed to access the API. You can sign up free at [IPGeolocation.io](https://ipgeolocation.io).
 
 **Your IPGeolocation.io API key** is what connects the sheet to the service. Find it in your dashboard after signing in. See the [Save Your API Key](#save-your-api-key) step for how to use it.
 
