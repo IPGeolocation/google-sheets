@@ -385,7 +385,7 @@ This is also helpful when a formula returns a blank result and you want to check
 
 If you want to share this setup with your team or publish it as a template, share these two files: `Code.gs` (the Apps Script file) and `README.md` (this documentation file).
 
-The best experience for new users is to create a sample Google Sheet with all columns and formulas already in place using the [Recommended Sheet Layout](#recommended-sheet-layout), then share it as a Google Sheets template. Users make a copy, open the IPGeolocation.io menu, set their own API key following the [Save Your API Key](#save-your-api-key) step, paste in their IP addresses, and they are ready to go.
+The best experience for new users is to create a sample Google Sheet with all columns and formulas already in place using the [Recommended Sheet Layout](#recommended-sheet-layout), then share it as a Google Sheets template. Users make a copy, open the IPGeolocation.io menu, set their own API key following the [Save Your API Key](#save-your-api-key) step, paste in their IP addresses, and they are ready to go. Before you share the template, use the Clear API Key option in the IPGeolocation.io menu so it does not contain your key.
 
 For the best onboarding experience, consider using the tab structure described in [Suggested Sheet Structure for a Public Template](#suggested-sheet-structure-for-a-public-template).
 
@@ -395,9 +395,9 @@ For the best onboarding experience, consider using the tab structure described i
 
 This spreadsheet uses one IPGeolocation.io API key for all of its formulas.
 
-Save it through the IPGeolocation.io menu rather than entering it in a formula or cell. Anyone with edit access can access the attached Apps Script project and read or change its saved key.
+Save it through the IPGeolocation.io menu rather than entering it in a formula or cell. Anyone with edit access can access the attached Apps Script project and read or change its saved key, so only give edit access to people you trust with that key.
 
-For a separate API key, use a separate copy of the sheet and set the key in that copy. The Clear API Key menu option removes the key used by this sheet.
+For a separate API key, use a separate copy of the sheet and set the key in that copy. The Clear API Key menu option removes the key used by this sheet. Clear it before you share the sheet as a template.
 
 ---
 
