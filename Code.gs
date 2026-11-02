@@ -26,7 +26,7 @@ function onOpen() {
 }
 
 /**
- * Run this once to save the user's IPGeolocation.io API key.
+ * Saves the IPGeolocation.io API key used by this spreadsheet.
  */
 function setIpGeolocationApiKey() {
   const ui = SpreadsheetApp.getUi();
@@ -149,10 +149,11 @@ function IPSECURITY(ip, field) {
  */
 function IPGEO_BULK(ipRange, field, include) {
   try {
-    const ips = normalizeRangeToList_(ipRange);
+    const inputs = normalizeRangeToList_(ipRange);
+    const ips = inputs.filter(function (ip) { return ip !== ''; });
 
     if (!ips.length) {
-      return [['']];
+      return inputs.length ? inputs.map(function () { return ['']; }) : [['']];
     }
 
     if (ips.length > IPGEO_CONFIG.MAX_BULK_SIZE) {
@@ -161,8 +162,13 @@ function IPGEO_BULK(ipRange, field, include) {
 
     const results = fetchIpGeoBulk_(ips, include);
 
-    return results.map(function (item) {
-      return [getNestedValue_(item, field)];
+    if (!Array.isArray(results) || results.length !== ips.length) {
+      throw new Error('Invalid bulk response: expected one result per IP address.');
+    }
+
+    let resultIndex = 0;
+    return inputs.map(function (ip) {
+      return [ip === '' ? '' : getNestedValue_(results[resultIndex++], field)];
     });
   } catch (error) {
     return [[formatError_(error)]];
@@ -223,76 +229,68 @@ function fetchIpSecurity_(ip) {
 }
 
 function fetchIpGeoBulk_(ips, include) {
-  const apiKey = getApiKey_();
-
-  const params = { apiKey: apiKey, output: 'json' };
+  const params = {};
 
   if (include && String(include).trim()) {
     params.include = String(include).trim();
   }
 
-  const url = `${IPGEO_CONFIG.BASE_URL}/ipgeo-bulk?${buildQueryString_(params)}`;
-  const cacheKey = makeCacheKey_('POST:' + url + ':' + JSON.stringify(ips));
-  const cached = CacheService.getScriptCache().get(cacheKey);
-
-  if (cached) {
-    return JSON.parse(cached);
-  }
-
-  const response = UrlFetchApp.fetch(url, {
+  return fetchJsonWithCache_(buildUrl_('/ipgeo-bulk', params), {
     method: 'post',
     contentType: 'application/json',
     payload: JSON.stringify({ ips: ips }),
     muteHttpExceptions: true
   });
+}
 
-  const statusCode = response.getResponseCode();
-  const body = response.getContentText();
+function fetchJsonWithCache_(url, options) {
+  options = options || { method: 'get', muteHttpExceptions: true };
+  const cacheKey = makeCacheKey_(options.method.toUpperCase() + ':' + url + ':' + (options.payload || ''));
+  const cached = getCachedJson_(cacheKey);
 
-  if (statusCode < 200 || statusCode >= 300) {
-    throw new Error(`IPGeolocation.io API error ${statusCode}: ${body}`);
+  if (cached !== null) {
+    return cached;
   }
 
-  const data = JSON.parse(body);
+  const requestKey = decodeURIComponent((url.match(/[?&]apiKey=([^&]*)/i) || [])[1] || '');
+  let data;
+  try {
+    const response = UrlFetchApp.fetch(url, options);
+    const statusCode = response.getResponseCode();
+    const body = response.getContentText();
 
-  CacheService.getScriptCache().put(
-    cacheKey,
-    JSON.stringify(data),
-    IPGEO_CONFIG.CACHE_TTL_SECONDS
-  );
+    if (statusCode < 200 || statusCode >= 300) {
+      throw new Error(`IPGeolocation.io API error ${statusCode}: ${body}`);
+    }
 
+    data = JSON.parse(body);
+  } catch (error) {
+    throw new Error(redactErrorMessage_(error, requestKey));
+  }
+
+  cacheJson_(cacheKey, data);
   return data;
 }
 
-function fetchJsonWithCache_(url) {
-  const cacheKey = makeCacheKey_('GET:' + url);
-  const cached = CacheService.getScriptCache().get(cacheKey);
-
-  if (cached) {
-    return JSON.parse(cached);
+function getCachedJson_(cacheKey) {
+  try {
+    const cached = CacheService.getScriptCache().get(cacheKey);
+    return cached ? JSON.parse(cached) : null;
+  } catch (error) {
+    return null;
   }
+}
 
-  const response = UrlFetchApp.fetch(url, {
-    method: 'get',
-    muteHttpExceptions: true
-  });
-
-  const statusCode = response.getResponseCode();
-  const body = response.getContentText();
-
-  if (statusCode < 200 || statusCode >= 300) {
-    throw new Error(`IPGeolocation.io API error ${statusCode}: ${body}`);
+function cacheJson_(cacheKey, data) {
+  try {
+    const json = JSON.stringify(data);
+    if (json.length > 100000 || Utilities.newBlob(json).getBytes().length > 100000) {
+      return;
+    }
+    CacheService.getScriptCache().put(cacheKey, json, IPGEO_CONFIG.CACHE_TTL_SECONDS);
+  } catch (error) {
+    return;
   }
-
-  const data = JSON.parse(body);
-
-  CacheService.getScriptCache().put(
-    cacheKey,
-    JSON.stringify(data),
-    IPGEO_CONFIG.CACHE_TTL_SECONDS
-  );
-
-  return data;
 }
 
 function buildUrl_(path, params) {
@@ -364,26 +362,13 @@ function getNestedValue_(object, path) {
 }
 
 function normalizeRangeToList_(range) {
-  if (!Array.isArray(range)) {
-    return String(range || '').trim() ? [String(range).trim()] : [];
-  }
-
   const list = [];
-
-  range.forEach(function (row) {
-    if (Array.isArray(row)) {
-      row.forEach(function (cell) {
-        const value = String(cell || '').trim();
-        if (value) {
-          list.push(value);
-        }
-      });
-    } else {
-      const value = String(row || '').trim();
-      if (value) {
-        list.push(value);
-      }
-    }
+  const rows = Array.isArray(range) ? range : [range];
+  rows.forEach(function (row) {
+    const cells = Array.isArray(row) ? row : [row];
+    cells.forEach(function (cell) {
+      list.push(String(cell || '').trim());
+    });
   });
 
   return list;
@@ -404,5 +389,22 @@ function makeCacheKey_(value) {
 }
 
 function formatError_(error) {
-  return 'Error: ' + error.message;
+  try {
+    const apiKey = PropertiesService.getScriptProperties().getProperty(IPGEO_CONFIG.API_KEY_PROPERTY);
+    return 'Error: ' + redactErrorMessage_(error, apiKey);
+  } catch (storageError) {
+    return 'Error: IPGeolocation.io request failed.';
+  }
+}
+
+function redactErrorMessage_(error, apiKey) {
+  let message = error && error.message !== undefined ? String(error.message) : String(error || 'Request failed.');
+  if (apiKey) {
+    const variants = [apiKey, encodeURIComponent(apiKey), JSON.stringify(apiKey).slice(1, -1)];
+    variants.sort(function (a, b) { return b.length - a.length; }).forEach(function (value) {
+      const pattern = value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      message = message.replace(new RegExp(pattern, 'gi'), '[REDACTED]');
+    });
+  }
+  return message.replace(/([?&]apiKey=)[^&#\s"'<>]*/gi, '$1[REDACTED]');
 }

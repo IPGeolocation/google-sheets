@@ -104,7 +104,7 @@ The first time you run a function, Google will ask you to review and approve per
 
 After permission is granted, a small popup will appear asking for your API key. Paste your IPGeolocation.io API key and click **OK**.
 
-Your key is now saved securely inside the script settings. You never need to put it inside a formula or a cell. To learn more about why this matters, see [Important Notes About API Keys](#important-notes-about-api-keys).
+The sheet’s API key is now saved in its Apps Script project. All formulas in this sheet use this key. See [Important Notes About API Keys](#important-notes-about-api-keys) for details about sharing and editor access.
 
 ### Refresh Your Google Sheet
 
@@ -347,7 +347,7 @@ These shortcut formulas save typing for the most common lookups. They are equiva
 
 ### Bulk Lookup Formula
 
-When you have a large list of IP addresses, use `IPGEO_BULK` instead of individual formulas. It processes up to 50,000 IP addresses in a single call and fills a column of results automatically. This is much faster and puts less strain on your sheet than dragging individual formulas down hundreds of rows.
+`IPGEO_BULK` sends the nonblank IP addresses in a range in one request and returns results in the same order. Blank cells stay blank, so results remain aligned with the input. The request limit is 50,000 IP addresses; Google Apps Script execution limits also apply.
 
 ```excel
 =IPGEO_BULK(A2:A100, "location.country_name")
@@ -393,11 +393,11 @@ For the best onboarding experience, consider using the tab structure described i
 
 ## Important Notes About API Keys
 
-Every user should use their own IPGeolocation.io API key.
+This spreadsheet uses one IPGeolocation.io API key for all of its formulas.
 
-Never paste a real API key directly inside a formula or a cell. The script stores the key using Google Apps Script's built-in properties storage, which keeps it out of your spreadsheet entirely and makes the sheet safe to share.
+Save it through the IPGeolocation.io menu rather than entering it in a formula or cell. Anyone with edit access can access the attached Apps Script project and read or change its saved key.
 
-If a team member needs to use the same sheet, they should follow the [Save Your API Key](#save-your-api-key) step using their own key. If you need to remove a saved key at any time, use the Clear API Key option in the IPGeolocation.io menu.
+For a separate API key, use a separate copy of the sheet and set the key in that copy. The Clear API Key menu option removes the key used by this sheet.
 
 ---
 
@@ -491,8 +491,8 @@ This integration targets the IPGeolocation.io v3 API. The three endpoints used a
 
 `/v3/security` powers the [Dedicated Security Formula](#dedicated-security-formula).
 
-Results are cached for six hours using Google Apps Script's built-in cache service. This reduces API credit usage when the same IP address is looked up multiple times across formulas in the same sheet.
+Responses up to 100 KB may be cached for up to six hours using Google Apps Script's built-in cache service. Missing or invalid cached data triggers a fresh request. If caching fails, successful lookups still return their results.
 
-The API key is stored using `PropertiesService`, which is Google's secure key-value store for script settings. External HTTP requests are made using `UrlFetchApp`.
+The sheet’s API key is stored in script properties shared by the script’s users. External HTTP requests are made using `UrlFetchApp`.
 
 For the latest API field references, visit the [IPGeolocation.io API documentation](https://ipgeolocation.io/documentation.html).
