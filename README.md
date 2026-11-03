@@ -5,7 +5,7 @@ Turn any IP address into rich location, security, and network data right inside 
 
 ## What Is IPGeolocation.io for Google Sheets?
 
-IPGeolocation.io for Google Sheets is a free Google Apps Script integration that lets you look up any IP address directly from a spreadsheet cell. You type a formula, and the sheet fills in the country, city, timezone, currency, internet provider, VPN status, proxy status, and threat score for that IP address automatically.
+IPGeolocation.io for Google Sheets is a free Google Apps Script integration that lets you look up any IP address directly from a spreadsheet cell. You type a formula, and the sheet fills in the country, city, time zone, currency, internet provider, VPN status, proxy status, and threat score for that IP address automatically.
 
 This guide is written for everyday spreadsheet users. You do not need to be a developer. If you can copy and paste, you can set this up in under ten minutes.
 
@@ -21,7 +21,7 @@ Once set up, you can enrich any list of IP addresses with the following data typ
 
 **Network data** includes ASN number, organization name, and internet provider.
 
-**Time and currency** includes timezone name and local currency code.
+**Time and currency** includes time zone name and local currency code.
 
 **Security signals** include VPN detection, proxy detection, Tor detection, bot detection, cloud provider flag, and a numeric threat score.
 
@@ -244,7 +244,7 @@ Returns the longitude coordinate.
 ```excel
 =IPGEO(A2, "time_zone.name")
 ```
-Returns the timezone name, for example America/New_York.
+Returns the time zone name, for example America/New_York.
 
 ```excel
 =IPGEO(A2, "currency.code")
@@ -403,7 +403,7 @@ For a separate API key, use a separate copy of the sheet and set the key in that
 
 ## Important Notes About API Credits
 
-Basic IP lookups for country, city, timezone, currency, and ASN data use fewer credits per request than security lookups.
+Basic IP lookups for country, city, time zone, currency, and ASN data use fewer credits per request than security lookups.
 
 Only use [Security Formulas](#security-formulas) or the [Dedicated Security Formula](#dedicated-security-formula) when you actually need VPN, proxy, Tor, bot, cloud provider, or threat score data. Using basic formulas for non-security use cases will help you avoid spending credits unnecessarily.
 
@@ -471,7 +471,7 @@ If you are building a polished template to share with others, a five-tab layout 
 
 A **Start Here** tab with three simple actions: make a copy of the sheet, open the IPGeolocation.io menu and set your API key, and paste your IP addresses in column A.
 
-An **IP Enrichment** tab using the layout from [Recommended Sheet Layout](#recommended-sheet-layout), with location, network, timezone, and currency columns ready to use.
+An **IP Enrichment** tab using the layout from [Recommended Sheet Layout](#recommended-sheet-layout), with location, network, time zone, and currency columns ready to use.
 
 A **Security Review** tab focused on VPN, proxy, Tor, bot, and threat score columns using the formulas from [Security Formulas](#security-formulas).
 
