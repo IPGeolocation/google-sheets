@@ -5,8 +5,7 @@ on:
     branches: [main]
   pull_request:
 
-permissions:
-  contents: read
+permissions: {}
 
 jobs:
   test:
@@ -15,8 +14,17 @@ jobs:
       matrix:
         node: ['22', '24']
     steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
-      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
-        with:
-          node-version: ${{ matrix.node }}
-      - run: node --test test/Code.test.cjs
+      - name: Check out the commit under test
+        run: |
+          git init --quiet
+          git fetch --no-tags --depth=1 "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git" "$GITHUB_SHA"
+          git checkout --quiet --detach "$GITHUB_SHA"
+      - name: Run formula tests
+        env:
+          NODE_MAJOR: ${{ matrix.node }}
+        run: |
+          source "$HOME/.nvm/nvm.sh" --no-use
+          nvm install "$NODE_MAJOR"
+          test "$(node -p 'process.versions.node.split(".")[0]')" = "$NODE_MAJOR"
+          node --version
+          node --test test/Code.test.cjs

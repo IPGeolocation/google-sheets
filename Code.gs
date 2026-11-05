@@ -161,11 +161,6 @@ function IPGEO_BULK(ipRange, field, include) {
     }
 
     const results = fetchIpGeoBulk_(ips, include);
-
-    if (!Array.isArray(results) || results.length !== ips.length) {
-      throw new Error('Invalid bulk response: expected one result per IP address.');
-    }
-
     let resultIndex = 0;
     return inputs.map(function (ip) {
       return [ip === '' ? '' : getNestedValue_(results[resultIndex++], field)];
@@ -240,19 +235,36 @@ function fetchIpGeoBulk_(ips, include) {
     contentType: 'application/json',
     payload: JSON.stringify({ ips: ips }),
     muteHttpExceptions: true
-  });
+  }, ips.length);
 }
 
-function fetchJsonWithCache_(url, options) {
+function prepareBulkResponse_(rows, expectedRows, requestKey) {
+  if (!Array.isArray(rows) || rows.length !== expectedRows) {
+    throw new Error('Invalid bulk response: expected one result per IP address.');
+  }
+  let changed = false;
+  for (const row of rows) {
+    if (row && typeof row.message === 'string' && !Object.prototype.hasOwnProperty.call(row, 'ip')) {
+      const message = redactErrorMessage_(row, requestKey);
+      if (message !== row.message) {
+        row.message = message;
+        changed = true;
+      }
+    }
+  }
+  return changed;
+}
+
+function fetchJsonWithCache_(url, options, expectedRows) {
   options = options || { method: 'get', muteHttpExceptions: true };
   const cacheKey = makeCacheKey_(options.method.toUpperCase() + ':' + url + ':' + (options.payload || ''));
-  const cached = getCachedJson_(cacheKey);
+  const requestKey = decodeURIComponent((url.match(/[?&]apiKey=([^&]*)/i) || [])[1] || '');
+  const cached = getCachedJson_(cacheKey, expectedRows, requestKey);
 
   if (cached !== null) {
     return cached;
   }
 
-  const requestKey = decodeURIComponent((url.match(/[?&]apiKey=([^&]*)/i) || [])[1] || '');
   let data;
   try {
     const response = UrlFetchApp.fetch(url, options);
@@ -264,6 +276,9 @@ function fetchJsonWithCache_(url, options) {
     }
 
     data = JSON.parse(body);
+    if (expectedRows !== undefined) {
+      prepareBulkResponse_(data, expectedRows, requestKey);
+    }
   } catch (error) {
     throw new Error(redactErrorMessage_(error, requestKey));
   }
@@ -272,10 +287,20 @@ function fetchJsonWithCache_(url, options) {
   return data;
 }
 
-function getCachedJson_(cacheKey) {
+function getCachedJson_(cacheKey, expectedRows, requestKey) {
   try {
-    const cached = CacheService.getScriptCache().get(cacheKey);
-    return cached ? JSON.parse(cached) : null;
+    const cache = CacheService.getScriptCache();
+    const cached = cache.get(cacheKey);
+    if (!cached) return null;
+    const data = JSON.parse(cached);
+    if (expectedRows !== undefined && prepareBulkResponse_(data, expectedRows, requestKey)) {
+      try {
+        cache.remove(cacheKey);
+      } catch (error) {
+        return data;
+      }
+    }
+    return data;
   } catch (error) {
     return null;
   }
