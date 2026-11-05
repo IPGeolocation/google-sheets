@@ -36,6 +36,10 @@ function loadScript(settings = {}) {
       assert.ok(Buffer.byteLength(value, 'utf8') <= 100000);
       writes.push({ key, value, ttl });
       entries.set(key, value);
+    },
+    remove: key => {
+      if (settings.removeError) throw new Error('Cache unavailable');
+      entries.delete(key);
     }
   };
   const context = vm.createContext({
@@ -75,7 +79,7 @@ function loadScript(settings = {}) {
     }
   });
   vm.runInContext(source, context, { filename: 'Code.gs' });
-  return { context, properties, requests, writes };
+  return { context, properties, requests, writes, entries };
 }
 
 const plain = value => JSON.parse(JSON.stringify(value));
@@ -141,15 +145,22 @@ test('bulk validates the nonblank request count and response length', () => {
   assert.match(loadScript({ data: {} }).context.IPGEO_BULK(['8.8.8.8'], 'location.city')[0][0], /bulk response/i);
 });
 
-test('bulk accepts 50000 nonblank inputs while retaining extra blank positions', () => {
+test('bulk keeps all 50000 mixed results in order with extra blank positions', () => {
   const ips = Array(50000).fill('8.8.8.8');
-  const { context: c, requests } = loadScript({ data: ips.map(() => ({ city: 'A' })) });
-  const values = c.IPGEO_BULK(['', ...ips, ''], 'city');
+  const key = 'large-batch-fixture';
+  const data = ips.map((ip, i) => i % 5 === 0 ? { message: 'Invalid: ' + key } : { ip, index: i });
+  const { context: c, requests, writes } = loadScript({ key, data });
+  const values = c.IPGEO_BULK(['', ...ips, ''], '');
   assert.equal(values.length, 50002);
   assert.equal(values[0][0], '');
-  assert.equal(values[1][0], 'A');
-  assert.equal(values[50000][0], 'A');
   assert.equal(values[50001][0], '');
+  for (let i = 0; i < ips.length; i++) {
+    const row = JSON.parse(values[i + 1][0]);
+    if (i % 5 === 0) assert.equal(row.message, 'Invalid: [REDACTED]');
+    else assert.deepEqual(row, data[i]);
+  }
+  assert.equal(requests.length, 1);
+  assert.equal(writes.length, 0);
   assert.equal(JSON.parse(requests[0].options.payload).ips.length, 50000);
 });
 
@@ -158,6 +169,99 @@ test('per-entry API errors do not shift later bulk results', () => {
     { city: 'A' }, { message: 'Invalid IP address' }, { city: 'B' }
   ] });
   assert.deepEqual(plain(c.IPGEO_BULK(['8.8.8.8', 'invalid', '', '1.1.1.1'], 'city')), [['A'], [''], [''], ['B']]);
+});
+
+test('bulk masks keys in error rows before displaying or caching them', () => {
+  const key = 'fixture+key/%';
+  const good = { ip: '8.8.8.8', message: 'Public result: ' + key, city: 'A' };
+  const error = { message: 'Failed: ' + key + ' or ' + encodeURIComponent(key) };
+  const app = loadScript({ key, data: [good, error] });
+  const inputs = ['8.8.8.8', '', 'invalid'];
+  const masked = 'Failed: [REDACTED] or [REDACTED]';
+  assert.deepEqual(plain(app.context.IPGEO_BULK(inputs, 'message')), [[good.message], [''], [masked]]);
+  const raw = app.context.IPGEO_BULK(inputs, '');
+  assert.deepEqual(JSON.parse(raw[0][0]), good);
+  assert.deepEqual(JSON.parse(raw[2][0]), { message: masked });
+  assert.deepEqual(JSON.parse(app.writes[0].value), [good, { message: masked }]);
+  assert.equal(app.requests.length, 1);
+  assert.equal(app.writes.length, 1);
+});
+
+test('older cached error rows are safe to display even if cache removal fails', () => {
+  for (const removeError of [false, true]) {
+    const key = 'fixture-old-key';
+    const app = loadScript({ key, removeError, data: [{ message: 'Invalid address' }] });
+    app.context.IPGEO_BULK(['invalid'], 'message');
+    const cacheKey = app.writes[0].key;
+    app.entries.set(cacheKey, JSON.stringify([{ message: 'Failed: ' + key }]));
+    assert.equal(JSON.parse(app.context.IPGEO_BULK(['invalid'], '')[0][0]).message, 'Failed: [REDACTED]');
+    assert.equal(app.requests.length, 1);
+    if (!removeError) assert.ok(!(app.entries.get(cacheKey) || '').includes(key));
+  }
+});
+
+test('bulk masks the key used for the request if the saved key changes', () => {
+  const key = 'original-fixture';
+  const app = loadScript({
+    key,
+    get data() {
+      app.properties.set('IPGEOLOCATION_API_KEY', 'replacement-fixture');
+      return [{ message: 'Invalid: ' + key }];
+    }
+  });
+  assert.deepEqual(plain(app.context.IPGEO_BULK(['invalid'], 'message')), [['Invalid: [REDACTED]']]);
+  assert.ok(!app.writes[0].value.includes(key));
+});
+
+test('an incomplete live response does not prevent the next lookup from succeeding', () => {
+  const good = [{ city: 'A' }, { city: 'B' }];
+  const inputs = ['8.8.8.8', '1.1.1.1'];
+  for (const invalid of [[good[0]], [...good, good[0]], {}, null,
+    [good[0], null], [good[0], 42], [good[0], 'invalid'], [good[0], []]]) {
+    const settings = { data: invalid };
+    const app = loadScript(settings);
+    assert.match(app.context.IPGEO_BULK(inputs, 'city')[0][0], /expected one result per IP address/);
+    assert.equal(app.writes.length, 0);
+    settings.data = good;
+    assert.deepEqual(plain(app.context.IPGEO_BULK(inputs, 'city')), [['A'], ['B']]);
+    assert.deepEqual(plain(app.context.IPGEO_BULK(inputs, 'city')), [['A'], ['B']]);
+    assert.equal(app.requests.length, 2);
+    assert.equal(app.writes.length, 1);
+  }
+});
+
+test('a wrong-sized cache entry triggers one fresh request per lookup', () => {
+  const inputs = ['8.8.8.8', '1.1.1.1'];
+  for (const data of [[{ city: 'A' }, { city: 'B' }], []]) {
+    const app = loadScript({ cached: '[{"city":"stale"}]', data });
+    const result = plain(app.context.IPGEO_BULK(inputs, 'city'));
+    if (data.length) assert.deepEqual(result, [['A'], ['B']]);
+    else assert.match(result[0][0], /expected one result per IP address/);
+    assert.equal(app.requests.length, 1);
+    assert.equal(app.writes.length, data.length ? 1 : 0);
+  }
+});
+
+test('invalid cache entries are removed even when the fresh reply cannot be cached', () => {
+  const key = 'fixture-cache-key';
+  const inputs = ['8.8.8.8', '1.1.1.1'];
+  const good = [{ city: 'A' }, { city: 'B' }];
+  for (const status of [200, 503]) {
+    for (const stale of ['{broken', JSON.stringify([{ message: key }]), JSON.stringify([null, { message: key }])]) {
+      const settings = { key, data: good };
+      const app = loadScript(settings);
+      app.context.IPGEO_BULK(inputs, 'city');
+      const cacheKey = app.writes[0].key;
+      app.entries.set(cacheKey, stale);
+      settings.status = status;
+      settings.data = status === 200 ? [{ city: 'x'.repeat(100001) }, good[1]] : { message: key };
+      const result = app.context.IPGEO_BULK(inputs, 'city');
+      if (status === 200) assert.equal(result[1][0], 'B');
+      else assert.match(result[0][0], /503.*\[REDACTED\]/);
+      assert.equal(app.requests.length, 2);
+      assert.equal(app.entries.has(cacheKey), false);
+    }
+  }
 });
 
 for (const setting of ['readError', 'writeError', 'cacheError']) {
