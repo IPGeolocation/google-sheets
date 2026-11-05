@@ -216,7 +216,8 @@ test('bulk masks the key used for the request if the saved key changes', () => {
 test('an incomplete live response does not prevent the next lookup from succeeding', () => {
   const good = [{ city: 'A' }, { city: 'B' }];
   const inputs = ['8.8.8.8', '1.1.1.1'];
-  for (const invalid of [[good[0]], [...good, good[0]], {}, null]) {
+  for (const invalid of [[good[0]], [...good, good[0]], {}, null,
+    [good[0], null], [good[0], 42], [good[0], 'invalid'], [good[0], []]]) {
     const settings = { data: invalid };
     const app = loadScript(settings);
     assert.match(app.context.IPGEO_BULK(inputs, 'city')[0][0], /expected one result per IP address/);
@@ -238,6 +239,28 @@ test('a wrong-sized cache entry triggers one fresh request per lookup', () => {
     else assert.match(result[0][0], /expected one result per IP address/);
     assert.equal(app.requests.length, 1);
     assert.equal(app.writes.length, data.length ? 1 : 0);
+  }
+});
+
+test('invalid cache entries are removed even when the fresh reply cannot be cached', () => {
+  const key = 'fixture-cache-key';
+  const inputs = ['8.8.8.8', '1.1.1.1'];
+  const good = [{ city: 'A' }, { city: 'B' }];
+  for (const status of [200, 503]) {
+    for (const stale of ['{broken', JSON.stringify([{ message: key }]), JSON.stringify([null, { message: key }])]) {
+      const settings = { key, data: good };
+      const app = loadScript(settings);
+      app.context.IPGEO_BULK(inputs, 'city');
+      const cacheKey = app.writes[0].key;
+      app.entries.set(cacheKey, stale);
+      settings.status = status;
+      settings.data = status === 200 ? [{ city: 'x'.repeat(100001) }, good[1]] : { message: key };
+      const result = app.context.IPGEO_BULK(inputs, 'city');
+      if (status === 200) assert.equal(result[1][0], 'B');
+      else assert.match(result[0][0], /503.*\[REDACTED\]/);
+      assert.equal(app.requests.length, 2);
+      assert.equal(app.entries.has(cacheKey), false);
+    }
   }
 });
 

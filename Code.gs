@@ -239,12 +239,13 @@ function fetchIpGeoBulk_(ips, include) {
 }
 
 function prepareBulkResponse_(rows, expectedRows, requestKey) {
-  if (!Array.isArray(rows) || rows.length !== expectedRows) {
+  if (!Array.isArray(rows) || rows.length !== expectedRows ||
+      rows.some(row => row === null || typeof row !== 'object' || Array.isArray(row))) {
     throw new Error('Invalid bulk response: expected one result per IP address.');
   }
   let changed = false;
   for (const row of rows) {
-    if (row && typeof row.message === 'string' && !Object.prototype.hasOwnProperty.call(row, 'ip')) {
+    if (typeof row.message === 'string' && !Object.prototype.hasOwnProperty.call(row, 'ip')) {
       const message = redactErrorMessage_(row, requestKey);
       if (message !== row.message) {
         row.message = message;
@@ -288,22 +289,23 @@ function fetchJsonWithCache_(url, options, expectedRows) {
 }
 
 function getCachedJson_(cacheKey, expectedRows, requestKey) {
+  let cleaned = null;
   try {
     const cache = CacheService.getScriptCache();
     const cached = cache.get(cacheKey);
     if (!cached) return null;
-    const data = JSON.parse(cached);
-    if (expectedRows !== undefined && prepareBulkResponse_(data, expectedRows, requestKey)) {
-      try {
-        cache.remove(cacheKey);
-      } catch (error) {
-        return data;
-      }
+    try {
+      const data = JSON.parse(cached);
+      if (expectedRows === undefined || !prepareBulkResponse_(data, expectedRows, requestKey)) return data;
+      cleaned = data;
+    } catch (error) {
+      cleaned = null;
     }
-    return data;
+    cache.remove(cacheKey);
   } catch (error) {
-    return null;
+    return cleaned;
   }
+  return cleaned;
 }
 
 function cacheJson_(cacheKey, data) {
