@@ -19,7 +19,7 @@ Once set up, you can enrich any list of IP addresses with the following data typ
 
 **Location data** includes country, city, state, latitude, and longitude.
 
-**Network data** includes ASN number, organization name, and internet provider.
+**Network data** includes AS number, organization name, and internet provider.
 
 **Time and currency** includes time zone name and local currency code.
 
@@ -256,7 +256,7 @@ Returns the currency code, for example USD or EUR.
 ```excel
 =IPGEO(A2, "asn.as_number")
 ```
-Returns the ASN number.
+Returns the AS number.
 
 ```excel
 =IPGEO(A2, "asn.organization")
